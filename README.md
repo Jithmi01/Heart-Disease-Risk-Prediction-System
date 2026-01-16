@@ -2,6 +2,8 @@
 
 A full-stack web application that predicts heart disease risk levels using machine learning and provides explainable insights to support early medical decision-making.
 
+![App Screenshot](frontend/img/image.png)
+
 ---
 
 ## 📌 Project Description
