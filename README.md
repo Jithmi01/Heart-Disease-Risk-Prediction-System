@@ -118,6 +118,19 @@ heart-disease-prediction/
 ```
 ---
 
+## Screenshots
+
+### Home Page
+![Home Page](frontend/src/img/homeimg.png)
+[Click me](#home-screenshot) to view in detail
+
+### Dashboard
+![Dashboard](frontend/src/img/image.png)
+[Click me](#dashboard-screenshot) to view in detail
+
+## Interactive Documentation
+
+For a better viewing experience with detailed screenshots, please visit [Documentation Page](./docs/screenshots.html)
 
 ---
 
