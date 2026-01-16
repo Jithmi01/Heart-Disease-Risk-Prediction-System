@@ -14,6 +14,13 @@ This project aims to support early detection, preventive care, and data-driven d
 
 ---
 
+## Web application Screens
+
+For a better viewing experience with detailed screenshots, please visit [Screens Page](./docs/screenshots.md)
+
+---
+
+
 ## 🎯 Objectives
 - Predict heart disease risk using machine learning
 - Classify patients into Low, Medium, and High risk groups
@@ -119,11 +126,6 @@ heart-disease-prediction/
 ---
 
 
-## Interactive Documentation
-
-For a better viewing experience with detailed screenshots, please visit [Documentation Page](./docs/screenshots.md)
-
----
 
 ## ⚙️ Installation & Setup
 
