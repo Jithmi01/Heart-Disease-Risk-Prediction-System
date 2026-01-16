@@ -89,7 +89,7 @@ Explainable AI techniques are used to:
 
 ---
 
-## Folder Structure
+## 📂 Folder Structure
 ```bash
 heart-disease-prediction/
 │
@@ -159,5 +159,5 @@ npm start
 
 
 
-## 📂 Project Structure
+
 
