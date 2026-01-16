@@ -121,7 +121,7 @@ heart-disease-prediction/
 
 ## Interactive Documentation
 
-For a better viewing experience with detailed screenshots, please visit [Documentation Page](./docs/screenshots.html)
+For a better viewing experience with detailed screenshots, please visit [Documentation Page](./docs/screenshots.md)
 
 ---
 
