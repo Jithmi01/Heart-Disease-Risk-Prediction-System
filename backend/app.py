@@ -40,9 +40,9 @@ except Exception as e:
 FEATURE_COLUMNS = [
     'age', 'sex', 'resting_blood_pressure', 'cholestoral',
     'Max_heart_rate', 'exercise_induced_angina',
-    'chest_pain_type_atypical_angina',
-    'chest_pain_type_non_anginal_pain',
-    'chest_pain_type_typical_angina'
+    'chest_pain_type_Atypical angina',
+    'chest_pain_type_Non-anginal pain',
+    'chest_pain_type_Typical angina'
 ]
 
 # ==========================================
@@ -107,8 +107,9 @@ def login():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ==========================================
-# PREDICTION ROUTE
+
+# # ==========================================
+# PREDICTION ROUTE - WITH PATIENT DETAILS
 # ==========================================
 
 @app.route('/api/predict', methods=['POST'])
@@ -127,7 +128,15 @@ def predict():
         
         data = request.json
         
-        # Prepare input features
+        # Extract patient personal details
+        patient_details = {
+            'name': data.get('patientName', ''),
+            'address': data.get('patientAddress', ''),
+            'phone': data.get('patientPhone', ''),
+            'email': data.get('patientEmail', '')
+        }
+        
+        # Prepare input features with EXACT column names from training
         patient_input = {
             'age': float(data['age']),
             'sex': 1 if data['sex'] == 'Male' else 0,
@@ -135,20 +144,25 @@ def predict():
             'cholestoral': float(data['cholesterol']),
             'Max_heart_rate': float(data['maxHeartRate']),
             'exercise_induced_angina': 1 if data['exerciseAngina'] == 'Yes' else 0,
-            'chest_pain_type_typical_angina': 1 if data['chestPainType'] == 'Typical Angina' else 0,
-            'chest_pain_type_atypical_angina': 1 if data['chestPainType'] == 'Atypical Angina' else 0,
-            'chest_pain_type_non_anginal_pain': 1 if data['chestPainType'] == 'Non-anginal Pain' else 0
+            'chest_pain_type_Typical angina': 1 if data['chestPainType'] == 'Typical Angina' else 0,
+            'chest_pain_type_Atypical angina': 1 if data['chestPainType'] == 'Atypical Angina' else 0,
+            'chest_pain_type_Non-anginal pain': 1 if data['chestPainType'] == 'Non-anginal Pain' else 0
         }
         
         # Convert to DataFrame
         df = pd.DataFrame([patient_input])
         
-        # Ensure all feature columns exist
+        # Ensure all feature columns exist in the correct order
         for col in FEATURE_COLUMNS:
             if col not in df.columns:
                 df[col] = 0
         
+        # Reorder to match training
         df = df[FEATURE_COLUMNS]
+        
+        print("Input DataFrame:")
+        print(df)
+        print("\nFeature columns:", df.columns.tolist())
         
         # Scale features
         X_scaled = scaler.transform(df)
@@ -163,10 +177,12 @@ def predict():
         # Calculate risk factors
         risk_factors = []
         for i, (feat, imp) in enumerate(zip(FEATURE_COLUMNS, feature_importance)):
-            if df[feat].values[0] != 0:  # Only show active features
+            if df[feat].values[0] != 0 or feat in ['age', 'sex', 'resting_blood_pressure', 'cholestoral', 'Max_heart_rate']:
                 contribution = imp * 100
+                # Clean up feature names for display
+                display_name = feat.replace('_', ' ').replace('chest pain type ', '').title()
                 risk_factors.append({
-                    'factor': feat.replace('_', ' ').title(),
+                    'factor': display_name,
                     'contribution': round(contribution, 1)
                 })
         
@@ -187,9 +203,10 @@ def predict():
         # Generate recommendations
         recommendations = generate_recommendations(risk_level, patient_input)
         
-        # Save prediction to database
+        # Save prediction to database with patient details
         prediction_record = {
             'user_id': user_id,
+            'patient_details': patient_details,  # Added patient details
             'patient_data': data,
             'prediction': prediction,
             'probability': probability,
@@ -212,6 +229,9 @@ def predict():
         }), 200
     
     except Exception as e:
+        print("ERROR:", str(e))
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ==========================================
@@ -328,7 +348,7 @@ def get_predictions():
         return jsonify({'error': str(e)}), 500
 
 # ==========================================
-# GENERATE PDF REPORT
+# GENERATE PDF REPORT - WITH PATIENT DETAILS
 # ==========================================
 
 @app.route('/api/generate-report/<report_id>', methods=['GET'])
@@ -341,7 +361,7 @@ def generate_report(report_id):
         
         # Create PDF buffer
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
         elements = []
         
         # Styles
@@ -349,9 +369,9 @@ def generate_report(report_id):
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
-            fontSize=24,
+            fontSize=26,
             textColor=colors.HexColor('#2563eb'),
-            spaceAfter=30,
+            spaceAfter=20,
             alignment=1  # Center
         )
         
@@ -364,57 +384,134 @@ def generate_report(report_id):
             spaceBefore=12
         )
         
-        # Title
-        title = Paragraph("❤️ Heart Disease Risk Assessment Report", title_style)
-        elements.append(title)
+        subheading_style = ParagraphStyle(
+            'CustomSubHeading',
+            parent=styles['Heading3'],
+            fontSize=14,
+            textColor=colors.HexColor('#3b82f6'),
+            spaceAfter=8,
+            spaceBefore=8
+        )
+        
+        # Logo/Header Section
+        header_text = Paragraph(
+            "<b>❤️ HEART CARE MEDICAL CENTER</b><br/>"
+    ,
+            title_style
+        )
+        elements.append(header_text)
         elements.append(Spacer(1, 20))
         
-        # Date
+
+        
+        # Date and Report ID
         date_text = prediction['created_at'].strftime('%B %d, %Y at %I:%M %p')
-        date_para = Paragraph(f"<b>Report Generated:</b> {date_text}", styles['Normal'])
-        elements.append(date_para)
+        info_text = Paragraph(
+            f"<b>Report ID:</b> {report_id}<br/>"
+            f"<b>Date Generated:</b> {date_text}",
+            styles['Normal']
+        )
+        elements.append(info_text)
         elements.append(Spacer(1, 20))
         
-        # Patient Information
-        elements.append(Paragraph("Patient Information", heading_style))
+        # Horizontal line
+        from reportlab.platypus import HRFlowable
+        elements.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#2563eb')))
+        elements.append(Spacer(1, 20))
+        
+        # Patient Personal Information
+        patient_details = prediction.get('patient_details', {})
+        if patient_details.get('name'):
+            elements.append(Paragraph("PATIENT INFORMATION", heading_style))
+            
+            patient_info_data = []
+            if patient_details.get('name'):
+                patient_info_data.append(['Patient Name', patient_details['name']])
+            if patient_details.get('address'):
+                patient_info_data.append(['Address', patient_details['address']])
+            if patient_details.get('phone'):
+                patient_info_data.append(['Phone Number', patient_details['phone']])
+            if patient_details.get('email'):
+                patient_info_data.append(['Email', patient_details['email']])
+            
+            if patient_info_data:
+                patient_info_table = Table(patient_info_data, colWidths=[2*inch, 4*inch])
+                patient_info_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e0e7ff')),
+                    ('BACKGROUND', (1, 0), (1, -1), colors.HexColor('#f3f4f6')),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 11),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                    ('TOPPADDING', (0, 0), (-1, -1), 12),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.white),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+                ]))
+                
+                elements.append(patient_info_table)
+                elements.append(Spacer(1, 20))
+        
+        # Clinical Data
+        elements.append(Paragraph("CLINICAL MEASUREMENTS", heading_style))
         patient_data = [
-            ['Age', str(prediction['patient_data']['age']) + ' years'],
-            ['Sex', prediction['patient_data']['sex']],
-            ['Resting Blood Pressure', str(prediction['patient_data']['restingBP']) + ' mm Hg'],
-            ['Cholesterol Level', str(prediction['patient_data']['cholesterol']) + ' mg/dl'],
-            ['Max Heart Rate', str(prediction['patient_data']['maxHeartRate']) + ' bpm'],
-            ['Chest Pain Type', prediction['patient_data']['chestPainType']],
-            ['Exercise Induced Angina', prediction['patient_data']['exerciseAngina']]
+            ['Parameter', 'Value', 'Unit'],
+            ['Age', str(prediction['patient_data']['age']), 'years'],
+            ['Sex', prediction['patient_data']['sex'], ''],
+            ['Resting Blood Pressure', str(prediction['patient_data']['restingBP']), 'mm Hg'],
+            ['Cholesterol Level', str(prediction['patient_data']['cholesterol']), 'mg/dl'],
+            ['Maximum Heart Rate', str(prediction['patient_data']['maxHeartRate']), 'bpm'],
+            ['Chest Pain Type', prediction['patient_data']['chestPainType'], ''],
+            ['Exercise Induced Angina', prediction['patient_data']['exerciseAngina'], '']
         ]
         
-        patient_table = Table(patient_data, colWidths=[3*inch, 3*inch])
+        patient_table = Table(patient_data, colWidths=[2.5*inch, 2*inch, 1.5*inch])
         patient_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f3f4f6')),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('GRID', (0, 0), (-1, -1), 1, colors.white)
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
         ]))
         
         elements.append(patient_table)
         elements.append(Spacer(1, 20))
         
-        # Risk Assessment
-        elements.append(Paragraph("Risk Assessment", heading_style))
+        # Risk Assessment - Highlighted Box
+        elements.append(Paragraph("RISK ASSESSMENT RESULTS", heading_style))
+        
         risk_color = prediction.get('risk_color', '#10b981')
-        risk_para = Paragraph(
-            f"<b>Risk Level:</b> <font color='{risk_color}'>{prediction['risk_level']}</font><br/>"
-            f"<b>Probability:</b> {prediction['probability']:.1f}%",
-            styles['Normal']
-        )
-        elements.append(risk_para)
+        risk_box_data = [
+            ['Risk Level', prediction['risk_level']],
+            ['Risk Probability', f"{prediction['probability']:.1f}%"]
+        ]
+        
+        risk_box = Table(risk_box_data, colWidths=[2*inch, 4*inch])
+        risk_box.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fef3c7')),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.black),
+            ('TEXTCOLOR', (1, 0), (1, 0), colors.HexColor(risk_color)),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+            ('TOPPADDING', (0, 0), (-1, -1), 15),
+            ('GRID', (0, 0), (-1, -1), 2, colors.HexColor('#f59e0b')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        ]))
+        
+        elements.append(risk_box)
         elements.append(Spacer(1, 20))
         
         # Risk Factors
-        elements.append(Paragraph("Contributing Risk Factors", heading_style))
-        risk_factors_data = [['Factor', 'Contribution']]
+        elements.append(Paragraph("CONTRIBUTING RISK FACTORS", heading_style))
+        risk_factors_data = [['Risk Factor', 'Contribution (%)']]
         for factor in prediction['risk_factors']:
             risk_factors_data.append([factor['factor'], f"{factor['contribution']}%"])
         
@@ -422,12 +519,15 @@ def generate_report(report_id):
         risk_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
         ]))
         
         elements.append(risk_table)
@@ -436,35 +536,63 @@ def generate_report(report_id):
         # Recommendations
         recs = prediction['recommendations']
         
-        elements.append(Paragraph("Medical Recommendations", heading_style))
-        elements.append(Paragraph(f"<b>{recs['immediate_action']}</b>", styles['Normal']))
-        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("MEDICAL RECOMMENDATIONS", heading_style))
+        
+        # Immediate Action - Highlighted
+        immediate_box = Table([[recs['immediate_action']]], colWidths=[6*inch])
+        box_color = '#fee2e2' if 'High Risk' in prediction['risk_level'] else '#fef3c7' if 'Medium Risk' in prediction['risk_level'] else '#d1fae5'
+        immediate_box.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(box_color)),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+            ('TOPPADDING', (0, 0), (-1, -1), 15),
+            ('BOX', (0, 0), (-1, -1), 2, colors.HexColor(risk_color)),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        ]))
+        elements.append(immediate_box)
+        elements.append(Spacer(1, 15))
         
         # Lifestyle
-        elements.append(Paragraph("<b>Lifestyle Modifications:</b>", styles['Normal']))
+        elements.append(Paragraph("Lifestyle Modifications:", subheading_style))
         for item in recs['lifestyle']:
             elements.append(Paragraph(f"• {item}", styles['Normal']))
         elements.append(Spacer(1, 12))
         
         # Diet
-        elements.append(Paragraph("<b>Dietary Recommendations:</b>", styles['Normal']))
+        elements.append(Paragraph("Dietary Recommendations:", subheading_style))
         for item in recs['diet']:
             elements.append(Paragraph(f"• {item}", styles['Normal']))
         elements.append(Spacer(1, 12))
         
         # Exercise
-        elements.append(Paragraph("<b>Exercise Guidelines:</b>", styles['Normal']))
+        elements.append(Paragraph("Exercise Guidelines:", subheading_style))
         for item in recs['exercise']:
             elements.append(Paragraph(f"• {item}", styles['Normal']))
         elements.append(Spacer(1, 20))
         
-        # Disclaimer
+        # Footer with disclaimer
+        elements.append(HRFlowable(width="100%", thickness=1, color=colors.grey))
+        elements.append(Spacer(1, 10))
+        
         disclaimer = Paragraph(
-            "<i>Disclaimer: This report is generated by an AI system and should not replace professional medical advice. "
-            "Please consult with a qualified healthcare provider for proper diagnosis and treatment.</i>",
-            styles['Normal']
+            "<i><b>Medical Disclaimer:</b> This report is generated by an AI-powered risk assessment system "
+            "and is intended for informational purposes only. It should not replace professional medical advice, "
+            "diagnosis, or treatment. Always consult with a qualified healthcare provider for proper medical evaluation "
+            "and personalized treatment recommendations.</i>",
+            ParagraphStyle('Disclaimer', parent=styles['Normal'], fontSize=8, textColor=colors.grey)
         )
         elements.append(disclaimer)
+        
+        footer_text = Paragraph(
+            "<b>Heart Care Medical Center</b> | Advanced Cardiac Assessment Division<br/>"
+            "Report ID: " + report_id + " | " + date_text,
+            ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=1, textColor=colors.grey)
+        )
+        elements.append(Spacer(1, 10))
+        elements.append(footer_text)
         
         # Build PDF
         doc.build(elements)
@@ -478,6 +606,9 @@ def generate_report(report_id):
         )
     
     except Exception as e:
+        print("PDF Generation Error:", str(e))
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ==========================================
