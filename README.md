@@ -16,7 +16,7 @@ This project aims to support early detection, preventive care, and data-driven d
 
 ## Web application Screens
 
-For a better viewing experience with detailed screenshots, please visit [Screens Page](./docs/screenshots.md)
+For a better viewing experience with detailed screenshots, please visit [Screens Page](screens.md)
 
 ---
 
