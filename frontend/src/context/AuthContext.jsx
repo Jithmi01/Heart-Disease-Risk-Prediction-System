@@ -1,42 +1,48 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import axios from "axios";
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import api from '../config/api';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      const storedUser = JSON.parse(localStorage.getItem("user") || "null");
-      setUser(storedUser);
+      const userData = JSON.parse(localStorage.getItem('user') || 'null');
+      setUser(userData);
     }
+    setLoading(false);
   }, [token]);
 
   const login = async (email, password) => {
-    const res = await axios.post("http://localhost:5000/api/login", { email, password });
+    const res = await api.post('/login', { email, password });
     setToken(res.data.token);
     setUser(res.data.user);
-    localStorage.setItem("token", res.data.token);
-    localStorage.setItem("user", JSON.stringify(res.data.user));
+    localStorage.setItem('token', res.data.token);
+    localStorage.setItem('user', JSON.stringify(res.data.user));
   };
 
   const register = async (name, email, password) => {
-    await axios.post("http://localhost:5000/api/register", { name, email, password });
+    await api.post('/register', { name, email, password });
+  };
+
+  const updateProfile = async (name, email) => {
+    const updatedUser = { ...user, name, email };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   const logout = () => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    delete axios.defaults.headers.common["Authorization"];
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, updateProfile, loading }}>
       {children}
     </AuthContext.Provider>
   );
