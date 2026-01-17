@@ -79,6 +79,11 @@ For a better viewing experience with detailed screenshots, please visit [Screens
 
 ---
 
+## Model Test Accutacy
+![model Screenshot](frontend/src/img/testaccuracy.png)
+
+---
+
 ## 📤 Output
 - Heart disease risk level (Low / Medium / High)
 - Prediction confidence
